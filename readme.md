@@ -1,20 +1,10 @@
-Curtain.js
+Curtain.js (The plugin is no longer maintained)
 ========================================
 
 This plugin allows you to create a web page with multiple fixed panels that unroll with an amusing effect. Exactly like a curtain rises.
  
 To navigate, you can use your keyboard instead the scrollbar or mousewheel to navigate into the document. 
 But that's not all, there is more features! For example, you can easily add a fixed element or multiple "steps" element inside a pannel.
-
-I created this plugin for the website of my friend [Etienne](http://artographik.fr/) but we didn't use it. And I decided to deliver this one as an open source project.
-I would like you to note that the transition effect between two panels is extensively inspired by http://editsquarterly.com
-We were also such inspired by the following websites:
-
-* http://www.interviewmagazine.com
-* http://dbworks.pro
-* http://www.deuxhuithuit.com/en
-* http://madebygrave.com
-* http://www.boston.com/bigpicture/
 
 Feel free to fork the project on github or ping me on [twitter](http://twitter.com/_victa) for any comments.
 
@@ -26,13 +16,9 @@ Feel free to fork the project on github or ping me on [twitter](http://twitter.c
 
 ### Site using Curtain.js
 
-* http://www.visualstoryteller.nl/
-* http://chronopizza.net/
-* http://threepointline.cc
-* http://www.youdesignit.com/guides/t-shirts
-* http://hivemined.org/
-
-Send me your :)
+* [http://sports.espn.go.com/espn/eticket/story?page=Dock-Ellis](http://sports.espn.go.com/espn/eticket/story?page=Dock-Ellis)
+* [http://womenandtech.com/](http://womenandtech.com/)
+* [http://iconic-furniture.com/](http://iconic-furniture.com/)
 
 ## Documentation
 
@@ -158,29 +144,6 @@ $(function () {
     });
 });
 ```
-
-### Add a new panel dynamically
-
-You can add a new panel in your list dynamically. Simply use the public function called 'insert'.
-
-
-```js
-var html = [
-    '<h1>My New Panel!</h1>',
-    '<p>Lorem ipsum dolor sit amet, consectetur adipisicing elit</p>'
-].join('');
-
-$('.curtains').data('plugin_curtain').insert({
-    html:html,
-    htmlId: 'newpannel',
-    htmlClass: 'cover',
-    insertAfter:'#intro', // If null, the content is inserted at the end
-    goTo: false // Go to the new panel directly after the insertion (default: true)
-});
-
-```
-
-**``id``, ``class``, ``insertAfter`` and ``goTo`` attributes are optional.**
 
 ### Add callbacks to slide change events
 

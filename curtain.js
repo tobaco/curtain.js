@@ -1,7 +1,7 @@
 /*
 * Curtain.js - Create an unique page transitioning system
 * ---
-* Version: 1.4.1
+* Version: 2
 * Copyright 2011, Victor Coulon (http://victorcoulon.fr)
 * Released under the MIT Licence
 */
@@ -19,8 +19,9 @@
             curtainLinks: '.curtain-links',
             enableKeys: true,
             easing: 'swing',
-            nextSlide: null,
-            prevSlide: null
+            disabled: false,
+            nextSlide: function() {},
+            prevSlide: function() {}
         };
 
     // The actual plugin constructor
@@ -36,62 +37,6 @@
         this._ignoreHashChange = false;
 
         this.init();
-
-        // Public Functions
-        this.insert = function(content){
-            if(Object.prototype.toString.call(content) !== '[object Object]') {
-                throw new TypeError('Content must be an object');
-            }
-            content.goTo = (content.goTo === true) ? true : false;
-
-            // append the content to list
-            var newEl = $(document.createElement('li')).attr('id', (content.htmlId) ? content.htmlId : null)
-                                .attr('class', (content.htmlClass) ? content.htmlClass : null)
-                                .html( (content.html) ? content.html : null );
-            $(self.element).append(newEl);
-
-
-            // Append Content after an element OR at the end
-            if(content.insertAfter && $(content.insertAfter).length) {
-                $(self.element).find(content.insertAfter).after(newEl);
-            } else {
-                $(self.element).append(newEl);
-            }
-
-
-            // When the element is ready
-            self.readyElement($(newEl), function(){
-                // re(init) cache elements
-                self.$element = $(self.element);
-                self.$li = $(self.element).find('>li');
-
-                // Mobile Fix
-                if(self.options.mobile){
-                    self.$li.css({position:'relative'});
-                    self.$element.find('.fixed').css({position:'absolute'});
-                }
-                
-                self.setLinks();
-
-                // Set dimensions after loading images (or not)
-                if($(newEl).find('img').length){
-                    $(newEl).find('img').load(function(){
-                        self.setDimensions();
-                    });
-                } else {
-                    self.setDimensions();
-                }
-
-                // Scroll to the new element
-                if(content.goTo === true){
-                    var position = $(newEl).attr('data-position') || null;
-                    self.scrollEl.animate({
-                        scrollTop:position
-                    }, self.options.scrollSpeed, self.options.easing);
-                }
-            });
-
-        };
     }
 
     Plugin.prototype = {
@@ -101,24 +46,30 @@
             // Cache element
             this.$element = $(this.element);
             this.$li = $(this.element).find('>li');
+            this.$liLength = this.$li.length;
+            self.$windowHeight = $(window).height();
+            self.$elDatas = {};
+            self.$document = $(document);
+            self.$window = $(window);
 
 
+            self.webkit = (navigator.userAgent.indexOf('Chrome') > -1 || navigator.userAgent.indexOf("Safari") > -1);
+            $.Mozilla = (navigator.userAgent.match(/Firefox[\/\s](\d+\.\d+)/i));
+			$.IE = (navigator.userAgent.match(/MSIE[\/\s](\d+\.\d+)/i));
             $.Android = (navigator.userAgent.match(/Android/i));
             $.iPhone = ((navigator.userAgent.match(/iPhone/i)) || (navigator.userAgent.match(/iPod/i)));
             $.iPad = ((navigator.userAgent.match(/iPad/i)));
             $.iOs4 = (/OS [1-4]_[0-9_]+ like Mac OS X/i.test(navigator.userAgent));
 
-
-            if($.iPhone || $.iPad || $.Android){
+            if($.iPhone || $.iPad || $.Android || self.options.disabled){
                 this.options.mobile = true;
                 this.$li.css({position:'relative'});
                 this.$element.find('.fixed').css({position:'absolute'});
             }
-            
 
-            if(this.options.mobile){
+			if(this.options.mobile){
                this.scrollEl =  this.$element;
-            } else if($.browser.mozilla || $.browser.msie) {
+            } else if($.Mozilla || $.IE) {
                 this.scrollEl = $('html');
             } else {
                 this.scrollEl = $('body');
@@ -142,85 +93,62 @@
                 }
             }
 
-
-
-            // We'll check if our images are loaded
-            var images = [],
-                imagesLoaded = 0,
-                loadAllImages = function loadAllImages(callback){
-                    if(images.length === 0){
-                        callback();
-                        return false;
-                    }
-                    var img = new Image();
-                    $(img).attr('src',images[imagesLoaded]).load(function(){
-                    imagesLoaded++;
-                    if(imagesLoaded == images.length)
-                        callback();
-                    else
-                        loadAllImages(callback);
-                    });
-                };
-
-            self.$element.find('img').each(function(i,el){
-                images.push(el.src);
-            });
-
-
             // When all image is loaded
-            loadAllImages(function(){
+            var callbackImageLoaded = function(){
                 self.setDimensions();
                 self.$li.eq(0).addClass('current');
 
-                // Cache
-                self.$current = self.$element.find('.current');
-                self.$fixed = self.$current.find('.fixed');
-                self.$step = self.$current.find('.step');
-                self.currentP = parseInt(self.$current.attr('data-position'), 10);
-                self.currentHeight = parseInt(self.$current.attr('data-height'), 10);
+                self.setCache();
 
                 if(!self.options.mobile){
                     if(self.$li.eq(1).length)
-                        self.$li.eq(1).nextAll().css({display:'none'});
+                        self.$li.eq(1).nextAll().addClass('hidden');
                 }
 
                 self.setEvents();
                 self.setLinks();
                 self.isHashIsOnList(location.hash.substring(1));
-            });
+            };
 
+            if(self.$element.find('img').length) {
+				self.imageLoaded(callbackImageLoaded);
+			} else {
+                callbackImageLoaded();
+			}
         },
         // Events
         scrollToPosition: function (direction){
             var position = null,
                 self = this;
 
-            if($('html, body').is(':animated')){
+            if(self.scrollEl.is(':animated')){
                 return false;
             }
 
             if(direction === 'up' || direction == 'down'){
-
                 // Keyboard event
-                var $current = this.$element.find('.current'),
-                    $next = (direction === 'up') ? $current.prev() : $current.next();
-
-                position = $next.attr('data-position') || null;
+                var $next = (direction === 'up') ? self.$current.prev() : self.$current.next();
 
                 // Step in the current panel ?
-                if($current.find('.step').length){
-                    if(!$current.find('.current-step').length)
-                        $current.find('.step').eq(0).addClass('current-step');
-                    var $nextStep = (direction === 'up') ? $current.find('.current-step').prev('.step') : $current.find('.current-step').next('.step');
+                if(self.$step){
+
+                    if(!self.$current.find('.current-step').length){
+                        self.$step.eq(0).addClass('current-step');
+                    }
+
+                    var $nextStep = (direction === 'up') ? self.$current.find('.current-step').prev('.step') : self.$current.find('.current-step').next('.step');
+
                     if($nextStep.length) {
-                        position = (this.options.mobile) ? $nextStep.position().top + parseInt($current.attr('data-position'), 10) : $nextStep.offset().top;
+                        position = (self.options.mobile) ? $nextStep.position().top + self.$elDatas[self.$current.index()]['data-position'] : $nextStep.position().top + self.$elDatas[self.$current.index()]['data-position'];
                     }
                 }
 
-                if(position){
+                position = position || ((self.$elDatas[$next.index()] === undefined) ? null : self.$elDatas[$next.index()]['data-position']);
+
+                if(position !== null){
                     self.scrollEl.animate({
-                        scrollTop:position
-                    }, this.options.scrollSpeed, this.options.easing);
+                        scrollTop: position
+                    }, self.options.scrollSpeed, self.options.easing);
                 }
 
             } else if(direction === 'top'){
@@ -232,76 +160,129 @@
                     scrollTop:self.options.bodyHeight
                 }, self.options.scrollSpeed, self.options.easing);
             } else {
-                position = $("#"+direction).attr('data-position') || null;
-                if(position){
-                    self.scrollEl.animate({
-                        scrollTop:position
-                    }, this.options.scrollSpeed, this.options.easing);
-                }
+                var index = $("#"+direction).index(),
+                    speed = Math.abs(self.currentIndex-index) * (this.options.scrollSpeed*4) / self.$liLength;
+
+                self.scrollEl.animate({
+                    scrollTop:self.$elDatas[index]['data-position'] || null
+                }, (speed <= self.options.scrollSpeed) ? self.options.scrollSpeed : speed, this.options.easing);
             }
-            
+
         },
         scrollEvent: function() {
             var self = this,
-                docTop = $(document).scrollTop(),
-                windowHeight = $(window).height();
+                docTop = self.$document.scrollTop();
 
-
-            if(docTop < self.currentP && self.$current.index() > 0){
-                if (self.options.prevSlide) {
-                    self.options.prevSlide();
-                }
-
-                    
-                // Scroll top
+            if(docTop < self.currentP && self.currentIndex > 0){
+                // Scroll to top
                 self._ignoreHashChange = true;
+
                 if(self.$current.prev().attr('id'))
                     self.setHash(self.$current.prev().attr('id'));
-                 
-       
-                self.$current.removeClass('current').css({marginTop: 0})
-                    .nextAll().css({display:'none'}).end()
-                    .prev().addClass('current').css({display:'block'});
-  
-                // Cache
-                self.$current = self.$element.find('.current');
-                self.$fixed = self.$current.find('.fixed');
-                self.$step = self.$current.find('.step');
-                self.currentP = parseInt(self.$current.attr('data-position'), 10);
-                self.currentHeight = parseInt(self.$current.attr('data-height'), 10);
 
-            } else if(docTop < (self.currentP + self.$current.height())){
+                self.$current
+                    .removeClass('current')
+                    .css( (self.webkit) ? {'-webkit-transform': 'translateY(0px) translateZ(0)'} : {marginTop: 0} )
+                    .nextAll().addClass('hidden').end()
+                    .prev().addClass('current').removeClass('hidden');
+
+                self.setCache();
+                self.options.prevSlide();
+
+            } else if(docTop < (self.currentP + self.currentHeight)){
+
                 // Animate the current pannel during the scroll
-                var position = -(docTop-self.currentP);
-                self.$current.css({marginTop:position});
-
-                // If there is a fixed element in the current panel
-                if(self.$fixed.length){
-                    var dataTop = parseInt(self.$fixed.attr('data-top'), 10);
-                    
-                    if((docTop-self.currentP+windowHeight) >= self.currentHeight && self.$fixed.css('position') === 'fixed'){
-        
-                        self.$fixed.css({
-                            position: 'absolute',
-                            top: Math.abs(docTop-self.currentP + dataTop)
-                        });
-         
-
-                    } else if((docTop-self.currentP+windowHeight) <= self.currentHeight && self.$fixed.css('position') === 'absolute'){
-                        self.$fixed.css({
-                            position: 'fixed',
-                            top: dataTop
-                        });
-                    }
-
-                    
+                if(self.webkit) {
+                    self.$current.css({'-webkit-transform': 'translateY('+(-(docTop-self.currentP))+'px) translateZ(0)' });
+                } else {
+                    self.$current.css({marginTop: -(docTop-self.currentP) });
                 }
 
-                
+                // If there is a fixed element in the current panel
+                if(self.$fixedLength){
+                    var dataTop = parseInt(self.$fixed.attr('data-top'), 10);
+
+                    // Added "-200" to avoid overlap of element into next panel"
+					if(docTop + self.$windowHeight >= self.currentP + self.currentHeight - 200){
+                        self.$fixed.css({
+                            position: 'fixed'
+                        });
+                    } else {
+                        self.$fixed.css({
+                            position: 'absolute',
+                            marginTop: Math.abs(docTop-self.currentP)
+                        });
+                    }
+                }
+
                 // If there is a step element in the current panel
-                if(self.$step.length){
+                if(self.$stepLength){
                     $.each(self.$step, function(i,el){
-                        if($(el).offset().top <= docTop+5 && ($(el).offset().top + $(el).outerHeight()) >= docTop+5){
+                        if(($(el).position().top+self.currentP) <= docTop+5 && $(el).position().top + self.currentP + $(el).height() >= docTop+5){
+                            if(!$(el).hasClass('current-step')){
+                                self.$step.removeClass('current-step');
+                                $(el).addClass('current-step');
+                                return false;
+                            }
+                        }
+                    });
+                }
+
+
+                if(self.parallaxBg){
+                    self.$current.css({
+                        'background-position-y': docTop * self.parallaxBg
+                    });
+                }
+
+                if(self.$fade.length){
+                    self.$fade.css({
+                        'opacity': 1-(docTop/ self.$fade.attr('data-fade'))
+                    });
+                }
+
+                if(self.$slowScroll.length){
+                    self.$slowScroll.css({
+                        'margin-top' : (docTop / self.$slowScroll.attr('data-slow-scroll'))
+                    });
+                }
+
+            } else {
+                // Scroll bottom
+                self._ignoreHashChange = true;
+                if(self.$current.next().attr('id'))
+                    self.setHash(self.$current.next().attr('id'));
+
+                self.$current.removeClass('current')
+                    .addClass('hidden')
+                    .next('li').addClass('current').next('li').removeClass('hidden');
+
+                self.setCache();
+                self.options.nextSlide();
+            }
+
+        },
+        scrollMobileEvent: function() {
+            var self = this,
+                docTop = self.$element.scrollTop();
+
+            if(docTop+10 < self.currentP && self.currentIndex > 0){
+
+                // Scroll to top
+                self._ignoreHashChange = true;
+
+                if(self.$current.prev().attr('id'))
+                    self.setHash(self.$current.prev().attr('id'));
+
+                self.$current.removeClass('current').prev().addClass('current');
+                self.setCache();
+                self.options.prevSlide();
+            } else if(docTop+10 < (self.currentP + self.currentHeight)){
+
+                // If there is a step element in the current panel
+                if(self.$stepLength){
+                    $.each(self.$step, function(i,el){
+                        if(($(el).position().top+self.currentP) <= docTop && (($(el).position().top+self.currentP) + $(el).outerHeight()) >= docTop){
                             if(!$(el).hasClass('current-step')){
                                 self.$step.removeClass('current-step');
                                 $(el).addClass('current-step');
@@ -311,81 +292,55 @@
                 }
 
             } else {
-                if (self.options.nextSlide) {
-                    self.options.nextSlide();
-                }
+
                 // Scroll bottom
                 self._ignoreHashChange = true;
                 if(self.$current.next().attr('id'))
                     self.setHash(self.$current.next().attr('id'));
 
-                self.$current.removeClass('current')
-                    .css({display:'none'})
-                    .next().addClass('current').nextAll().css({display:'block'});
-
-                // Cache
-                self.$current = self.$element.find('.current');
-                self.$fixed = self.$current.find('.fixed');
-                self.$step = self.$current.find('.step');
-                self.currentP = parseInt(self.$current.attr('data-position'), 10);
-                self.currentHeight = parseInt(self.$current.attr('data-height'), 10);
-            }
-
-
-        },
-        scrollMobileEvent: function() {
-            var self = this;
-
-            var docTop = self.$element.scrollTop(),
-                $current = self.$element.find('.current'),
-                $step = $current.find('.step'),
-                currentP = parseInt($current.attr('data-position'), 10),
-                currentHeight = parseInt($current.attr('data-height'), 10),
-                windowHeight = $(window).height();
-
-            if(docTop+10 < currentP && $current.index() > 0){
-                $current.removeClass('current').prev().addClass('current');
-            } else if(docTop+10 < (currentP + $current.height())){
-
-                // If there is a step element in the current panel
-                if($step.length){
-                    $.each($step, function(i,el){
-                        if(($(el).position().top+currentP) <= docTop && (($(el).position().top+currentP) + $(el).outerHeight()) >= docTop){
-                            if(!$(el).hasClass('current-step')){
-                                $step.removeClass('current-step');
-                                $(el).addClass('current-step');
-                            }
-                        }
-                    });
-                }
-
-            } else {
-                $current.removeClass('current').next().addClass('current');
+                self.$current.removeClass('current').next().addClass('current');
+                self.setCache();
+                self.options.nextSlide();
             }
 
 
         },
         // Setters
         setDimensions: function(){
-            var windowHeight = $(window).height(),
+            var self = this,
                 levelHeight = 0,
                 cover = false,
                 height = null;
+
+            self.$windowHeight = self.$window.height();
 
             this.$li.each(function(index) {
                 var $self = $(this);
                 cover = $self.hasClass('cover');
 
                 if(cover){
-                    $self.css({height: windowHeight, zIndex: 999-index})
-                        .attr('data-height',windowHeight)
+                    $self.css({height: self.$windowHeight, zIndex: 999-index})
+                        .attr('data-height',self.$windowHeight)
                         .attr('data-position',levelHeight);
-                    levelHeight += windowHeight;
+
+                    self.$elDatas[$self.index()] = {
+                        'data-height': parseInt(self.$windowHeight,10),
+                        'data-position': parseInt(levelHeight, 10)
+                    };
+
+                    levelHeight += self.$windowHeight;
+
                 } else{
-                    height = ($self.outerHeight() <= windowHeight) ? windowHeight : $self.outerHeight();
+                    height = ($self.outerHeight() <= self.$windowHeight) ? self.$windowHeight : $self.outerHeight();
                     $self.css({minHeight: height, zIndex: 999-index})
                         .attr('data-height',height)
                         .attr('data-position',levelHeight);
+
+                     self.$elDatas[$self.index()] = {
+                        'data-height': parseInt(height, 10),
+                        'data-position': parseInt(levelHeight, 10)
+                    };
+
                     levelHeight += height;
                 }
 
@@ -409,13 +364,13 @@
                     self.scrollMobileEvent();
                 });
             } else {
-                $(window).on('scroll', function(){
+                self.$window.on('scroll', function(){
                     self.scrollEvent();
                 });
             }
-            
+
             if(self.options.enableKeys) {
-                $(document).on('keydown', function(e){
+                self.$document.on('keydown', function(e){
                     if(e.keyCode === 38 || e.keyCode === 37) {
                         self.scrollToPosition('up');
                         e.preventDefault();
@@ -460,13 +415,13 @@
                 $(self.options.curtainLinks).on('click', function(e){
                     e.preventDefault();
                     var href = $(this).attr('href');
-                    
+
                     if(!self.isHashIsOnList(href.substring(1)) && position)
                         return false;
 
-                    var position = $(href).attr('data-position') || null;
+                    var position = self.$elDatas[$(href).index()]['data-position'] || null;
                     if(position){
-                        self.scrollEl.animate({
+                        self.scrollEl.stop().animate({
                             scrollTop:position
                         }, self.options.scrollSpeed, self.options.easing);
                     }
@@ -474,20 +429,21 @@
                 });
             }
 
-            if ("onhashchange" in window) {
-                window.addEventListener("hashchange", function(){
-                    if(self._ignoreHashChange === false){
-                        self.isHashIsOnList(location.hash.substring(1));
-                    }
-                    self._ignoreHashChange = false;
-                }, false);
-            }
+            self.$window.on("hashchange", function(event){
+                if(self._ignoreHashChange === false){
+                    self.isHashIsOnList(location.hash.substring(1));
+                }
+                self._ignoreHashChange = false;
+            });
         },
         setBodyHeight: function(){
             var h = 0;
-            this.$li.each(function() {
-               h += $(this).height();
-            });
+
+            for (var key in this.$elDatas) {
+               var obj = this.$elDatas[key];
+               h += obj['data-height'];
+            }
+
             this.options.bodyHeight = h;
             $('body').height(h);
         },
@@ -499,12 +455,33 @@
             });
         },
         setHash: function(hash){
+            // "HARD FIX"
+            el = $('[href=#'+hash+']');
+            el.parent().siblings('li').removeClass('active');
+            el.parent().addClass('active');
+
             if(history.pushState) {
                 history.pushState(null, null, '#'+hash);
             }
             else {
                 location.hash = hash;
             }
+        },
+        setCache: function(){
+            var self = this;
+            self.$current = self.$element.find('.current');
+            self.$fixed = self.$current.find('.fixed');
+            self.$fixedLength = self.$fixed.length;
+            self.$step = self.$current.find('.step');
+            self.$stepLength = self.$step.length;
+            self.currentIndex = self.$current.index();
+            self.currentP = self.$elDatas[self.currentIndex]['data-position'];
+            self.currentHeight = self.$elDatas[self.currentIndex]['data-height'];
+
+            self.parallaxBg = self.$current.attr('data-parallax-background');
+            self.$fade = self.$current.find('[data-fade]');
+            self.$slowScroll = self.$current.find('[data-slow-scroll]');
+
         },
         // Utils
         isHashIsOnList: function(hash){
@@ -523,6 +500,25 @@
               clearInterval(interval);
             }
           },60);
+        },
+        imageLoaded: function(callback){
+            var self = this,
+                elems = self.$element.find('img'),
+                len   = elems.length,
+                blank = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+
+            elems.bind('load.imgloaded',function(){
+                if (--len <= 0 && this.src !== blank || $(this).not(':visible')){
+                    elems.unbind('load.imgloaded');
+                    callback.call(elems,this);
+                }
+            }).each(function(){
+                if (this.complete || this.complete === undefined){
+                    var src = this.src;
+                    this.src = blank;
+                    this.src = src;
+                }
+            });
         }
     };
 
