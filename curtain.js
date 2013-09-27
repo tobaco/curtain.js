@@ -196,9 +196,40 @@
                     self.$current.css({'-webkit-transform': 'translateY('+(-(docTop-self.currentP))+'px) translateZ(0)' });
                 } else {
                     self.$current.css({marginTop: -(docTop-self.currentP) });
-                }
+					
+					// Look for Parallax elements and animate them
+					if (self.hasParallax) { 
+					
+						// Faster scrolling than text
+						//self.$parallax.css({marginTop: -(((docTop - self.currentP) * 1) - (self.$parallax.position().top + self.$parallax.height())) });
+						
+						// slower scrolling than main text
+						
+						// default scrolling speed
+						var parallaxSpeed = .2;
+						//console.log(self.$parallax[0]);
+						
+		
+						// Check to see if element has a speed attribute and set the speed to that
+						for(var i=0, n= self.$parallax.length; i<n; i++) {
+								
+							if ($(self.$parallax.get(i)).attr("rel")) {
+								parallaxSpeed = $(self.$parallax.get(i)).attr("rel");
+								//console.log(self.$parallax.attr("rel"));
+							}
+							
+						   //console.log(docTop - self.currentP);
+						  
+						   $(self.$parallax.get(i)).css({paddingTop: -(((docTop - self.currentP) * -(parallaxSpeed))) });
+	
+						}
 
-                // If there is a fixed element in the current panel
+					}
+					
+				}
+                
+				
+				// If there is a fixed element in the current panel
                 if(self.$fixedLength){
                     var dataTop = parseInt(self.$fixed.attr('data-top'), 10);
 
@@ -477,7 +508,8 @@
             self.currentIndex = self.$current.index();
             self.currentP = self.$elDatas[self.currentIndex]['data-position'];
             self.currentHeight = self.$elDatas[self.currentIndex]['data-height'];
-
+			self.$parallax = self.$current.find('.parallax');
+			self.hasParallax = self.$parallax.length > 0;
             self.parallaxBg = self.$current.attr('data-parallax-background');
             self.$fade = self.$current.find('[data-fade]');
             self.$slowScroll = self.$current.find('[data-slow-scroll]');
