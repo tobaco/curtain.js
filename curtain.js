@@ -52,8 +52,6 @@
             self.$document = $(document);
             self.$window = $(window);
 
-
-            self.webkit = (navigator.userAgent.indexOf('Chrome') > -1 || navigator.userAgent.indexOf("Safari") > -1);
             $.Mozilla = (navigator.userAgent.match(/Firefox[\/\s](\d+\.\d+)/i));
 			$.IE = (navigator.userAgent.match(/MSIE[\/\s](\d+\.\d+)/i));
             $.Android = (navigator.userAgent.match(/Android/i));
@@ -182,7 +180,7 @@
 
                 self.$current
                     .removeClass('current')
-                    .css( (self.webkit) ? {'-webkit-transform': 'translateY(0px) translateZ(0)'} : {marginTop: 0} )
+                    .css( {marginTop: 0} )
                     .nextAll().addClass('hidden').end()
                     .prev().addClass('current').removeClass('hidden');
 
@@ -192,40 +190,35 @@
             } else if(docTop < (self.currentP + self.currentHeight)){
 
                 // Animate the current pannel during the scroll
-                if(self.webkit) {
-                    self.$current.css({'-webkit-transform': 'translateY('+(-(docTop-self.currentP))+'px) translateZ(0)' });
-                } else {
-                    self.$current.css({marginTop: -(docTop-self.currentP) });
+                self.$current.css({marginTop: -(docTop-self.currentP) });
+
+				// Look for Parallax elements and animate them
+				if (self.hasParallax) { 
+				
+					// Faster scrolling than text
+					//self.$parallax.css({marginTop: -(((docTop - self.currentP) * 1) - (self.$parallax.position().top + self.$parallax.height())) });
 					
-					// Look for Parallax elements and animate them
-					if (self.hasParallax) { 
+					// slower scrolling than main text
 					
-						// Faster scrolling than text
-						//self.$parallax.css({marginTop: -(((docTop - self.currentP) * 1) - (self.$parallax.position().top + self.$parallax.height())) });
-						
-						// slower scrolling than main text
-						
-						// default scrolling speed
-						var parallaxSpeed = .2;
-						//console.log(self.$parallax[0]);
-						
-		
-						// Check to see if element has a speed attribute and set the speed to that
-						for(var i=0, n= self.$parallax.length; i<n; i++) {
-								
-							if ($(self.$parallax.get(i)).attr("rel")) {
-								parallaxSpeed = $(self.$parallax.get(i)).attr("rel");
-								//console.log(self.$parallax.attr("rel"));
-							}
-							
-						   //console.log(docTop - self.currentP);
-						  
-						   $(self.$parallax.get(i)).css({paddingTop: -(((docTop - self.currentP) * -(parallaxSpeed))) });
+					// default scrolling speed
+					var parallaxSpeed = .2;
+					//console.log(self.$parallax[0]);
+					
 	
+					// Check to see if element has a speed attribute and set the speed to that
+					for(var i=0, n= self.$parallax.length; i<n; i++) {
+							
+						if ($(self.$parallax.get(i)).attr("data-parallax")) {
+							parallaxSpeed = $(self.$parallax.get(i)).attr("data-parallax");
+							//console.log(self.$parallax.attr("data-parallax"));
 						}
+						
+					   //console.log(docTop - self.currentP);
+					  
+					   $(self.$parallax.get(i)).css({paddingTop: -(((docTop - self.currentP) * -(parallaxSpeed))) });
 
 					}
-					
+
 				}
                 
 				
@@ -262,7 +255,7 @@
 
                 if(self.parallaxBg){
                     self.$current.css({
-                        'background-position-y': docTop * self.parallaxBg
+                        'background-position': '0 '+(docTop * self.parallaxBg !== 0 ? docTop * self.parallaxBg +'px' : 0)
                     });
                 }
 
@@ -508,7 +501,7 @@
             self.currentIndex = self.$current.index();
             self.currentP = self.$elDatas[self.currentIndex]['data-position'];
             self.currentHeight = self.$elDatas[self.currentIndex]['data-height'];
-			self.$parallax = self.$current.find('.parallax');
+			self.$parallax = self.$current.find('*[data-parallax]');
 			self.hasParallax = self.$parallax.length > 0;
             self.parallaxBg = self.$current.attr('data-parallax-background');
             self.$fade = self.$current.find('[data-fade]');
